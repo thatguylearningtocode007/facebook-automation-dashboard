@@ -10,8 +10,15 @@ function App() {
   const [caption, setCaption] = useState('');
   const [pages, setPages] = useState([]);
   const [selectedPages, setSelectedPages] = useState([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const platforms = [
+    { id: 'facebook', name: 'Facebook Reels' },
+    { id: 'instagram', name: 'Instagram Reels' },
+    { id: 'youtube', name: 'YouTube Shorts' },
+  ];
 
   useEffect(() => {
     // Fetch Facebook pages when the component mounts
@@ -37,13 +44,28 @@ function App() {
     }
   };
 
+  const handlePlatformSelection = (e) => {
+    const { value, checked } = e.target;
+    if (checked) {
+      setSelectedPlatforms(prev => [...prev, value]);
+    } else {
+      setSelectedPlatforms(prev => prev.filter(platformId => platformId !== value));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage('');
 
-    if (selectedPages.length === 0) {
-        setMessage('Please select at least one page to post to.');
+    if (selectedPlatforms.length === 0) {
+        setMessage('Please select at least one platform to post to.');
+        setIsLoading(false);
+        return;
+    }
+
+    if (selectedPlatforms.includes('facebook') && selectedPages.length === 0) {
+        setMessage('Please select at least one Facebook page to post a Reel.');
         setIsLoading(false);
         return;
     }
@@ -52,6 +74,11 @@ function App() {
     formData.append('video_url', videoUrl);
     formData.append('overlay_text', overlayText);
     formData.append('caption', caption);
+    
+    // Append each selected platform
+    selectedPlatforms.forEach(platform => {
+        formData.append('platforms', platform);
+    });
     
     // Append each selected page ID
     selectedPages.forEach(pageId => {
@@ -83,7 +110,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
       <div className="w-full max-w-2xl bg-gray-800 rounded-lg shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center mb-6 text-cyan-400">Facebook Video Automation</h1>
+        <h1 className="text-3xl font-bold text-center mb-6 text-cyan-400">Multi-Platform Video Automation</h1>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Video URL Input */}
@@ -138,28 +165,49 @@ function App() {
             </div>
           </div>
           
-          {/* Facebook Pages Selection */}
+          {/* Platform Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Select Facebook Pages</label>
-            <div className="max-h-40 overflow-y-auto bg-gray-700 border border-gray-600 rounded-md p-4 space-y-2">
-              {pages.length > 0 ? (
-                pages.map(page => (
-                  <div key={page.id} className="flex items-center">
-                    <input
-                      id={`page-${page.id}`}
-                      type="checkbox"
-                      value={page.id}
-                      onChange={handlePageSelection}
-                      className="h-4 w-4 rounded border-gray-500 bg-gray-600 text-cyan-600 focus:ring-cyan-500"
-                    />
-                    <label htmlFor={`page-${page.id}`} className="ml-3 text-sm text-gray-200">{page.name}</label>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-400">No pages found or still loading...</p>
-              )}
+            <label className="block text-sm font-medium text-gray-300 mb-2">Select Target Platforms</label>
+            <div className="bg-gray-700 border border-gray-600 rounded-md p-4 space-y-2">
+              {platforms.map(platform => (
+                <div key={platform.id} className="flex items-center">
+                  <input
+                    id={`platform-${platform.id}`}
+                    type="checkbox"
+                    value={platform.id}
+                    onChange={handlePlatformSelection}
+                    className="h-4 w-4 rounded border-gray-500 bg-gray-600 text-cyan-600 focus:ring-cyan-500"
+                  />
+                  <label htmlFor={`platform-${platform.id}`} className="ml-3 text-sm text-gray-200">{platform.name}</label>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Facebook Pages Selection (Conditional) */}
+          {selectedPlatforms.includes('facebook') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Select Facebook Pages</label>
+              <div className="max-h-40 overflow-y-auto bg-gray-700 border border-gray-600 rounded-md p-4 space-y-2">
+                {pages.length > 0 ? (
+                  pages.map(page => (
+                    <div key={page.id} className="flex items-center">
+                      <input
+                        id={`page-${page.id}`}
+                        type="checkbox"
+                        value={page.id}
+                        onChange={handlePageSelection}
+                        className="h-4 w-4 rounded border-gray-500 bg-gray-600 text-cyan-600 focus:ring-cyan-500"
+                      />
+                      <label htmlFor={`page-${page.id}`} className="ml-3 text-sm text-gray-200">{page.name}</label>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-400">No pages found or still loading...</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Schedule Time */}
           <div>
@@ -187,7 +235,7 @@ function App() {
 
         {/* Message Display */}
         {message && (
-          <div className={`mt-6 text-center text-sm p-3 rounded-md ${message.includes('Error') ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
+          <div className={`mt-6 text-center text-sm p-3 rounded-md ${message.toLowerCase().includes('error') ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
             {message}
           </div>
         )}

@@ -6,3 +6,5 @@ moviepy
 Flask-APScheduler
 tiktok-downloader
 google-cloud-storage
+google-auth-httplib2
+google-auth-oauthlib

@@ -1,5 +1,6 @@
 ```python
 import os
+import re
 import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
@@ -7,6 +8,7 @@ from flask_cors import CORS
 from flask_apscheduler import APScheduler
 from moviepy.editor import VideoFileClip, ImageClip, TextClip, CompositeVideoClip
 import yt_dlp
+from tiktok_downloader import TikTokDownloader
 
 # --- Configuration ---
 class Config:
@@ -75,14 +77,44 @@ def post_video_to_youtube(video_path, title, description):
 # --- Video Processing Logic ---
 
 def download_video(url, download_path):
-    """Downloads a video from a URL using yt-dlp."""
+    """
+    Downloads a video from a URL.
+    Uses a watermark removal library for TikTok URLs.
+    Uses yt-dlp for all other URLs.
+    """
+    # Check if the URL is a TikTok URL
+    if re.search(r'tiktok\.com', url):
+        print("TikTok URL detected. Using watermark removal downloader.")
+        try:
+            downloader = TikTokDownloader()
+            # The library automatically adds .mp4 to the filename
+            video_path_with_ext = f"{download_path}.mp4"
+            downloader.download(url, output_name=video_path_with_ext, watermark=False)
+            print(f"TikTok video downloaded without watermark to: {video_path_with_ext}")
+            return video_path_with_ext
+        except Exception as e:
+            print(f"TikTok download failed: {e}. Falling back to yt-dlp.")
+            # Fallback to yt-dlp if the TikTok downloader fails
+            pass
+
+    # Use yt-dlp for non-TikTok URLs or as a fallback
+    print("Using yt-dlp for download.")
     ydl_opts = {
         'outtmpl': download_path,
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'merge_output_format': 'mp4',
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-    return f"{download_path}.mp4"
+        info = ydl.extract_info(url, download=True)
+        # yt-dlp might download as .mp4 or another extension, find the actual file
+        filename = ydl.prepare_filename(info)
+        # If yt-dlp didn't add .mp4, we might need to find the file
+        if not filename.endswith('.mp4'):
+            # This is a simplification; the actual downloaded extension is in info['ext']
+            base, _ = os.path.splitext(filename)
+            filename = f"{base}.mp4"
+    return filename
+
 
 def process_video(input_path, logo_path, overlay_text):
     """Applies a logo and text overlay to a video."""
@@ -125,6 +157,8 @@ def scheduled_post_task(video_url, logo_path, overlay_text, page_ids, caption):
     """
     with app.app_context():
         print(f"Executing scheduled task for URL: {video_url}")
+        downloaded_video_path = None
+        processed_video_path = None
         try:
             # 1. Download video
             raw_video_filename = os.path.join('/tmp', f"raw_{uuid.uuid4()}")
@@ -142,15 +176,18 @@ def scheduled_post_task(video_url, logo_path, overlay_text, page_ids, caption):
             # 4. Post to YouTube (using caption as title and description for simplicity)
             post_video_to_youtube(processed_video_path, caption, caption)
 
-            # 5. Cleanup files
-            os.remove(downloaded_video_path)
-            os.remove(processed_video_path)
-            if logo_path:
-                os.remove(logo_path)
-            print("Cleanup complete.")
-
         except Exception as e:
             print(f"An error occurred during the scheduled task: {e}")
+        finally:
+            # 5. Cleanup files
+            print("Cleaning up temporary files...")
+            if downloaded_video_path and os.path.exists(downloaded_video_path):
+                os.remove(downloaded_video_path)
+            if processed_video_path and os.path.exists(processed_video_path):
+                os.remove(processed_video_path)
+            if logo_path and os.path.exists(logo_path):
+                os.remove(logo_path)
+            print("Cleanup complete.")
 
 # --- API Endpoints ---
 

@@ -4,3 +4,4 @@ facebook-business
 google-api-python-client
 moviepy
 Flask-APScheduler
+tiktok-downloader

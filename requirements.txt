@@ -1,0 +1,6 @@
+Flask
+yt-dlp
+facebook-business
+google-api-python-client
+moviepy
+Flask-APScheduler
